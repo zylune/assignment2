@@ -264,11 +264,11 @@ module `mname()`
 
    //next sample's x and y coordinate if jump right 
    
-   next_rt_samp_R14S[1][`$sig_fig`-1:0] = sample_R14S[1][`$sig_fig`-1:0]; 
+   assign next_rt_samp_R14S[1][`$sig_fig`-1:0] = sample_R14S[1][`$sig_fig`-1:0]; 
    
   // next_rt_samp_R14S[0][`$radix`:`$radix`-3] = sample_R14S[0][`$radix`:`$radix`-3] + subSample_RnnnnU;
    
-   next_rt_samp_R14S[0] = sample_R14S[0] + (subSample_RnnnnU << `$radix-3`);
+   assign next_rt_samp_R14S[0] = sample_R14S[0] + (subSample_RnnnnU << `$radix-3`);
   
    
    //next sample's x and y coordinate if jump up
@@ -294,32 +294,16 @@ module `mname()`
    always_comb begin
       unique case( state_R14H )
         ( WAIT_STATE ): begin
-		if (validPoly_R13H) begin
-		next_sample_R14S[0]   <= box_R13S[0][0];
-	    next_sample_R14S[1]   <= box_R13S[0][1];
-
-		next_validSamp_R14H <= 1;
-	    next_isQuad_R14H    <= isQuad_R13H;
-	    next_state_R14H     <= TEST_STATE;
-	    next_poly_R14S      <= poly_R13S;
-	    next_color_R14U     <= color_R13U;
-	    next_box_R14S       <= box_R13S;
-	    next_halt_RnnnnL    <= 0;
-				
-	    end
-	    else begin
-	    next_sample_R14S    = sample_R14S;
-	    next_validSamp_R14H = 0;
-	    next_isQuad_R14H    = isQuad_R13H;
-	    next_state_R14H     = WAIT_STATE;
-	    next_poly_R14S      = poly_R13S;
-	    next_color_R14U     = color_R13U;
-	    next_box_R14S       = box_R13S;
-	    next_halt_RnnnnL    = 1;
-		
-	    end
-	    end
-	( TEST_STATE ): begin
+		      next_sample_R14S    <= box_R13S[0];
+		      next_validSamp_R14H <= validPoly_R13H;
+	        next_isQuad_R14H    <= isQuad_R13H;
+	        next_state_R14H     <= validPoly_R13H ? TEST_STATE : WAIT_STATE;
+	        next_poly_R14S      <= poly_R13S;
+	        next_color_R14U     <= color_R13U;
+	        next_box_R14S       <= box_R13S;
+	        next_halt_RnnnnL    <= ~validPoly_R13H;
+	      end
+	      ( TEST_STATE ): begin
 	
 	// when sample is at the right edge but not the top edge, sample goes to 
 	  if  (at_right_edg_R14H & !at_end_box_R14H) begin 
@@ -341,8 +325,8 @@ module `mname()`
 	   next_isQuad_R14H    = isQuad_R14H;
 	   next_state_R14H     =  WAIT_STATE;
 	   next_poly_R14S      =  poly_R14S;
-	   next_color_R14U     =  color_R13U;
-	   next_box_R14S       =  box_R13S;
+	   next_color_R14U     =  color_R14U;
+	   next_box_R14S       =  box_R14S;
 	   next_halt_RnnnnL    =  1; 
 	   
 	   end
