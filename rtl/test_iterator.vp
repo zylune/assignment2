@@ -249,6 +249,8 @@ module `mname()`
    logic 				at_right_edg_R14H;      //Current sample at right edge of bbox?
    logic 				at_top_edg_R14H;        //Current sample at top edge of bbox?
    logic 				at_end_box_R14H;        //Current sample at end of bbox?
+   logic 				at_secondlast_box_R14H;        //Current sample at end of bbox?
+   logic 				trans_R14H=0;        //last sample is from end point?
 
    //////
    ////// First calculate the values of the helper signals using CURRENT STATES
@@ -264,7 +266,7 @@ module `mname()`
 
    //next sample's x and y coordinate if jump right 
    
-   next_rt_samp_R14S[1][`$sig_fig`-1:0] = sample_R14S[1][`$sig_fig`-1:0]; 
+   next_rt_samp_R14S[1] = sample_R14S[1]; 
    
   // next_rt_samp_R14S[0][`$radix`:`$radix`-3] = sample_R14S[0][`$radix`:`$radix`-3] + subSample_RnnnnU;
    
@@ -291,24 +293,24 @@ module `mname()`
 
    ////// COMPLETE THE FOLLOW ALWAYS_COMB BLOCK
    
-   always_comb begin
+  always_comb begin
       unique case( state_R14H )
         ( WAIT_STATE ): begin
 		if (validPoly_R13H) begin
-		next_sample_R14S[0]   <= box_R13S[0][0];
-	    next_sample_R14S[1]   <= box_R13S[0][1];
+	    next_sample_R14S    = box_R13S[0];
+	    
 
-		next_validSamp_R14H <= 1;
-	    next_isQuad_R14H    <= isQuad_R13H;
-	    next_state_R14H     <= TEST_STATE;
-	    next_poly_R14S      <= poly_R13S;
-	    next_color_R14U     <= color_R13U;
-	    next_box_R14S       <= box_R13S;
-	    next_halt_RnnnnL    <= 0;
+        next_validSamp_R14H = 1;
+	    next_isQuad_R14H    = isQuad_R13H;
+	    next_state_R14H     = TEST_STATE;
+	    next_poly_R14S      = poly_R13S;
+	    next_color_R14U     = color_R13U;
+	    next_box_R14S       = box_R13S;
+	    next_halt_RnnnnL    = 0;
 				
 	    end
 	    else begin
-	    next_sample_R14S    = sample_R14S;
+	    next_sample_R14S    = box_R13S[0];
 	    next_validSamp_R14H = 0;
 	    next_isQuad_R14H    = isQuad_R13H;
 	    next_state_R14H     = WAIT_STATE;
@@ -325,7 +327,7 @@ module `mname()`
 	  if  (at_right_edg_R14H & !at_end_box_R14H) begin 
 	   next_sample_R14S    = next_up_samp_R14S;
 	   next_validSamp_R14H = 1;
-	   next_isQuad_R14H    = isQuad_R14H;
+	   next_isQuad_R14H    =  isQuad_R14H;
 	   next_state_R14H     =  TEST_STATE;
 	   next_poly_R14S      =  poly_R14S;
 	   next_color_R14U     =  color_R14U;
@@ -334,18 +336,20 @@ module `mname()`
 	  
 	  
 	  end
-	  else if (at_top_edg_R14H & at_end_box_R14H) begin 
-	   next_sample_R14S[0] = box_R14S[0][0];
-	   next_sample_R14S[1] = box_R14S[0][1];
-	   next_validSamp_R14H = 0;
-	   next_isQuad_R14H    = isQuad_R14H;
+            
+	   else if (at_end_box_R14H) begin 
+	   next_sample_R14S = box_R14S[0];
+	
+	   next_validSamp_R14H =  0;
+	   next_isQuad_R14H    =  isQuad_R14H;
 	   next_state_R14H     =  WAIT_STATE;
 	   next_poly_R14S      =  poly_R14S;
-	   next_color_R14U     =  color_R13U;
-	   next_box_R14S       =  box_R13S;
+	   next_color_R14U     =  color_R14U;
+	   next_box_R14S       =  box_R14S;
 	   next_halt_RnnnnL    =  1; 
-	   
+	   	   
 	   end
+	   
 	   else begin 
 	   next_sample_R14S    = next_rt_samp_R14S;
 	   next_validSamp_R14H = 1;
@@ -360,8 +364,7 @@ module `mname()`
 	end      
       endcase // case ( state_R14H )
       
-   end //always_comb
-   
+   end //always_comb ends
    
    //////
    //////  RTL code for original FSM Finishes
@@ -398,18 +401,188 @@ module `mname()`
    
    ////// PLACE YOUR CODE HERE 
    
+   //////
+   //////  RTL code for original FSM Goes Here
+   //////
+   
+   // To build this FSM we want to have two more state: one is the working
+   // status of this FSM, and the other is the current bounding box where
+   // we iterate sample points
+   
+   // defin two more states, box_R14S and state_R14H
+   logic signed [`$sig_fig`-1:0] 	box_R14S[1:0][1:0];    		// the state for current bounding box
+   logic signed [`$sig_fig`-1:0] 	next_box_R14S[1:0][1:0];
+   typedef enum logic {
+			 WAIT_STATE, TEST_STATE
+		       } state_t;  
+   state_t                        state_R14H;     //State Designation (Waiting or Testing)
+   state_t                        next_state_R14H;        //Next Cycles State 
+   
+   // instantiate registers for storing these two states
+   //; my $d305 = generate( 'dff3', "d305", 
+   //;                        BitWidth=>$sig_fig,
+   //;                        ArraySize1=>2,
+   //;                        ArraySize2=>2,
+   //;                        PipelineDepth=>1,
+   //;                        Retime=>'NO' );
+   `$d305->instantiate()` (
+			   .in(next_box_R14S) , 
+			   .clk(clk) , .reset(rst), .en(1'b1),
+			   .out(box_R14S));
+   
+   
+   //; my $d306 = generate( 'dff', "d306", 
+   //;                        BitWidth=>1,
+   //;                        PipelineDepth=>1,
+   //;                        Retime=>'NO' );
+   `$d306->instantiate()` (
+			   .in(next_state_R14H) , 
+			   .clk(clk) , .reset(rst), .en(1'b1),
+			   .out(state_R14H));
+   
+   
+   // define some helper signals
+   logic signed [`$sig_fig`-1:0] 	next_up_samp_R14S[1:0]; //If jump up, next sample
+   logic signed [`$sig_fig`-1:0] 	next_rt_samp_R14S[1:0]; //If jump right, next sample
+   logic 				at_right_edg_R14H;      //Current sample at right edge of bbox?
+   logic 				at_top_edg_R14H;        //Current sample at top edge of bbox?
+   logic 				at_end_box_R14H;        //Current sample at end of bbox?
+   logic 				at_secondlast_box_R14H;        //Current sample at end of bbox?
 
 
+   //////
+   ////// First calculate the values of the helper signals using CURRENT STATES
+   //////
+
+   // check the comments 'A Note on Signal Names' 
+   // at the begining of the module for the help on
+   // understanding the signals here
+   
+   ////// PLACE YOUR CODE HERE
+   
+   always_comb begin
+
+   //next sample's x and y coordinate if jump right 
+   
+   next_rt_samp_R14S[1] = sample_R14S[1]; 
+   
+  // next_rt_samp_R14S[0][`$radix`:`$radix`-3] = sample_R14S[0][`$radix`:`$radix`-3] + subSample_RnnnnU;
+   
+   next_rt_samp_R14S[0] = sample_R14S[0] + (subSample_RnnnnU << `$radix-3`);
+  
+   
+   //next sample's x and y coordinate if jump up
+   next_up_samp_R14S[0] = box_R14S[0][0];
+   next_up_samp_R14S[1] = sample_R14S[1] + (subSample_RnnnnU << `$radix-3`);
+   
+  
+   // test if the current sample is at right edge or at top edge or at end of bbox
+   at_right_edg_R14H = sample_R14S[0] >= box_R14S[1][0];
+   at_top_edg_R14H = sample_R14S[1] >= box_R14S[1][1];
+   at_end_box_R14H = at_right_edg_R14H & at_top_edg_R14H;
+   at_secondlast_box_R14H = (sample_R14S[0] == (box_R14S[1][0] - (subSample_RnnnnU << `$radix-3`))) & at_top_edg_R14H;
 
 
+   end
+   
+   //////
+   ////// Then complete the following combinational logic defining the
+   ////// next states
+   //////
 
+   ////// COMPLETE THE FOLLOW ALWAYS_COMB BLOCK
+   
+   always_comb begin
+      unique case( state_R14H )
+        ( WAIT_STATE ): begin
+		if (validPoly_R13H) begin
+	    next_sample_R14S    = box_R13S[0];
+	    
 
+        next_validSamp_R14H = 1;
+	    next_isQuad_R14H    = isQuad_R13H;
+	    next_state_R14H     = TEST_STATE;
+	    next_poly_R14S      = poly_R13S;
+	    next_color_R14U     = color_R13U;
+	    next_box_R14S       = box_R13S;
+	    next_halt_RnnnnL    = 1;
+				
+	    end
+	    else begin
+	    next_sample_R14S    = box_R13S[0];
+	    next_validSamp_R14H = 0;
+	    next_isQuad_R14H    = isQuad_R13H;
+	    next_state_R14H     = WAIT_STATE;
+	    next_poly_R14S      = poly_R13S;
+	    next_color_R14U     = color_R13U;
+	    next_box_R14S       = box_R13S;
+	    next_halt_RnnnnL    = 1;
+		
+	    end
+	    end
+	( TEST_STATE ): begin
+	
+	// when sample is at the right edge but not the top edge, sample goes to 
+	  if  (at_right_edg_R14H & !at_end_box_R14H) begin 
+	   next_sample_R14S    = next_up_samp_R14S;
+	   next_validSamp_R14H = 1;
+	   next_isQuad_R14H    =  isQuad_R14H;
+	   next_state_R14H     =  TEST_STATE;
+	   next_poly_R14S      =  poly_R14S;
+	   next_color_R14U     =  color_R14U;
+	   next_box_R14S       =  box_R14S;
+	   next_halt_RnnnnL    =  0;
+	  
+	  
+	  end
+          
 
-
+	  else if (at_end_box_R14H) begin 
+	  if (validPoly_R13H) begin
+	  
+	   next_sample_R14S = box_R13S[0];
+	
+	   next_validSamp_R14H = 1;
+	   next_isQuad_R14H    = isQuad_R13H;
+	   next_state_R14H     =  TEST_STATE;
+	   next_poly_R14S      =  poly_R13S;
+	   next_color_R14U     =  color_R13U;
+	   next_box_R14S       =  box_R13S;
+	   next_halt_RnnnnL    =  1; 
+	   
+	  end
+	  else begin
+	  
+	  next_sample_R14S = box_R14S[0];
+	  next_validSamp_R14H = 0;
+	   next_isQuad_R14H    = isQuad_R14H;
+	   next_state_R14H     =  WAIT_STATE;
+	   next_poly_R14S      =  poly_R14S;
+	   next_color_R14U     =  color_R14U;
+	   next_box_R14S       =  box_R14S;
+	   next_halt_RnnnnL    =  1; 
+	  end
+	  
+	   
+	   
+	   end
+	   else begin 
+	   next_sample_R14S    = next_rt_samp_R14S;
+	   next_validSamp_R14H = 1;
+	   next_isQuad_R14H    = isQuad_R14H;
+	   next_state_R14H     = TEST_STATE;
+	   next_poly_R14S      =  poly_R14S;
+	   next_color_R14U     =  color_R14U;
+	   next_box_R14S       =  box_R14S;
+	   next_halt_RnnnnL    = 0;
+	  
+	   end
+	end      
+      endcase // case ( state_R14H )
+      
+   end //always_comb
    
 
-
-   
    //////
    //////  RTL code for modified FSM Finishes
    //////
